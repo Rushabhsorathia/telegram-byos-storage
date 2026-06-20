@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { startEncryptedUpload, type UploadHandle } from '../lib/uploader'
 import { useSession } from '../lib/store'
 import { StorageConnectionCard } from '../components/StorageConnectionCard'
+import { Icon } from '../components/Icon'
 
 interface ActiveUpload {
   name: string
@@ -58,11 +59,19 @@ export default function UploadPage() {
 
   return (
     <div>
-      <h2>Upload</h2>
+      <div className="section-title">
+        <h2>Upload files</h2>
+        <span className="tag info"><Icon name="shield" size={14} /> Zero-knowledge</span>
+      </div>
       <StorageConnectionCard connection={activeConnection} />
-      {!masterKey && (
-        <div className="card" style={{ borderColor: 'var(--accent-2)' }}>
-          <strong>Encryption:</strong> <span className="muted">Vault not unlocked — files will be encrypted with a raw data key (no passphrase wrap). Unlock for full zero-knowledge.</span>
+      {masterKey ? (
+        <div className="card" style={{ padding: '14px 18px' }}>
+          <span className="tag active"><span className="dot active" />Vault unlocked</span>{' '}
+          <span className="muted" style={{ fontSize: 13 }}>File keys will be wrapped with your master passphrase.</span>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: '14px 18px', borderColor: 'var(--warn-soft)', background: 'var(--warn-soft)' }}>
+          <strong>Vault not unlocked</strong> <span className="text-soft" style={{ fontSize: 13 }}>— files will be encrypted with a raw data key (no passphrase wrap).</span>
         </div>
       )}
 
@@ -74,22 +83,23 @@ export default function UploadPage() {
         onClick={() => document.getElementById('file-input')?.click()}
       >
         <input id="file-input" type="file" multiple style={{ display: 'none' }} onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-        <div style={{ fontSize: 18, marginBottom: 6 }}>Drop files here or click to select</div>
-        <div className="muted" style={{ fontSize: 13 }}>Files are encrypted in your browser (AES-256-GCM) before upload.</div>
+        <div className="dz-icon"><Icon name="upload" size={26} /></div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Drop files here or click to select</div>
+        <div style={{ fontSize: 13 }}>Encrypted in your browser with AES-256-GCM before anything leaves your device.</div>
       </div>
 
       {uploads.length > 0 && (
         <div className="card">
-          <h2>In progress</h2>
+          <h2>Transfers</h2>
           {uploads.map((u, i) => (
-            <div key={i} style={{ marginBottom: 14 }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <span>{u.name}</span>
+            <div key={i} style={{ marginBottom: 16 }}>
+              <div className="spread">
+                <span style={{ fontWeight: 600 }}>{u.name}</span>
                 <span className="muted">{u.error ? <span style={{ color: 'var(--danger)' }}>{u.error}</span> : `${u.percent}% · ${u.message}`}</span>
               </div>
-              <div className="progress" style={{ marginTop: 6 }}><div style={{ width: `${u.percent}%` }} /></div>
+              <div className="progress" style={{ marginTop: 8 }}><div style={{ width: `${u.percent}%` }} /></div>
               {u.fileId && u.percent === 100 && !u.error && (
-                <button className="ghost" style={{ marginTop: 8 }} onClick={() => nav(`/files/${u.fileId}`)}>View file</button>
+                <button className="subtle" style={{ marginTop: 10 }} onClick={() => nav(`/files/${u.fileId}`)}>View file <Icon name="chevron-right" size={15} /></button>
               )}
             </div>
           ))}

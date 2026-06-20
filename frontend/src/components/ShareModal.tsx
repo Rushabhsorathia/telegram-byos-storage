@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import type { Share } from '../lib/types'
+import { Icon } from './Icon'
 
 export function ShareModal({ fileId, shares, onClose }: { fileId: number; shares?: Share[]; onClose: () => void }) {
   const [password, setPassword] = useState('')
@@ -30,44 +31,48 @@ export function ShareModal({ fileId, shares, onClose }: { fileId: number; shares
   const link = created ? `${window.location.origin}/s/${created.token}` : ''
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div className="card" style={{ width: 460, maxWidth: '90vw' }}>
-        <div className="row" style={{ justifyContent: 'space-between' }}>
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="spread" style={{ marginBottom: 14 }}>
           <h2 style={{ margin: 0 }}>Share file</h2>
-          <button className="ghost" onClick={onClose}>✕</button>
+          <button className="ghost" style={{ padding: 8, width: 34 }} onClick={onClose}><Icon name="x" size={18} /></button>
         </div>
 
         {!created ? (
           <>
-            <input type="password" placeholder="Optional password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <label className="muted" style={{ fontSize: 12 }}>Expires at</label>
+            <label>Optional password</label>
+            <input type="password" placeholder="No password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <label>Expires at</label>
             <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
-            <label className="muted" style={{ fontSize: 12 }}>Max downloads</label>
+            <label>Max downloads</label>
             <input type="number" placeholder="Unlimited" value={maxDownloads} onChange={(e) => setMaxDownloads(e.target.value)} />
             {error && <div className="error">{error}</div>}
-            <button disabled={busy} onClick={create}>{busy ? 'Creating…' : 'Create link'}</button>
+            <button disabled={busy} onClick={create} style={{ width: '100%' }}>{busy ? 'Creating…' : <><Icon name="link" size={16} /> Create share link</>}</button>
           </>
         ) : (
           <>
             <p className="muted" style={{ fontSize: 13 }}>Anyone with this link can download the (still-encrypted) file. Recipients need the passphrase to decrypt.</p>
             <input readOnly value={link} onFocus={(e) => e.target.select()} />
             <div className="row">
-              <button onClick={() => navigator.clipboard.writeText(link)}>Copy</button>
-              <a href={link} target="_blank" rel="noreferrer"><button className="ghost">Open</button></a>
+              <button onClick={() => navigator.clipboard.writeText(link)}><Icon name="check" size={16} /> Copy link</button>
+              <a href={link} target="_blank" rel="noreferrer"><button className="ghost"><Icon name="open" size={16} /> Open</button></a>
             </div>
           </>
         )}
 
         {shares && shares.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Active shares</div>
-            {shares.map((s) => (
-              <div key={s.id} className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
-                /s/{s.token.slice(0, 10)}… · {s.download_count}/{s.max_downloads ?? '∞'} downloads
-                {s.expires_at && ` · expires ${new Date(s.expires_at).toLocaleDateString()}`}
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="divider" />
+            <label>Active shares</label>
+            <div className="stack">
+              {shares.map((s) => (
+                <div key={s.id} className="row" style={{ justifyContent: 'space-between', background: 'var(--surface-2)', padding: '8px 12px', borderRadius: 10 }}>
+                  <span className="mono" style={{ fontSize: 12 }}>/{s.token.slice(0, 14)}…</span>
+                  <span className="muted" style={{ fontSize: 12 }}>{s.download_count}/{s.max_downloads ?? '∞'} downloads</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

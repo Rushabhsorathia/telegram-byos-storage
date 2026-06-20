@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { api, http } from '../lib/api'
 import { decryptBlob } from '../lib/crypto'
 import { DownloadDecryptor } from '../components/DownloadDecryptor'
+import { Icon, fileIconName } from '../components/Icon'
 
 export default function SharePage() {
   const { token } = useParams()
@@ -14,23 +15,36 @@ export default function SharePage() {
   })
   const [pass, setPass] = useState('')
 
-  if (isLoading) return <div className="muted center" style={{ marginTop: 60 }}>Loading shared file…</div>
-  if (!data) return <div className="muted center" style={{ marginTop: 60 }}>Share not found.</div>
+  if (isLoading) return <div className="center-card"><div className="card center muted">Loading shared file…</div></div>
+  if (!data) return <div className="center-card"><div className="card center"><div className="empty" style={{ padding: 24 }}><div className="empty-ic"><Icon name="alert" size={36} /></div>Share not found.</div></div></div>
 
   const file = data.file
 
   return (
-    <div style={{ maxWidth: 520, margin: '60px auto' }}>
+    <div className="center-card">
+      <div className="brand-hero">
+        <div className="logo-lg"><Icon name="link" size={26} /></div>
+        <h1>Shared file</h1>
+        <p>Someone shared an encrypted file with you.</p>
+      </div>
       <div className="card">
-        <h2>{file.original_name}</h2>
-        <p className="muted">{(file.size_bytes / 1024 / 1024).toFixed(1)} MB · encrypted</p>
+        <div className="row" style={{ margin: 0, gap: 12, marginBottom: 16 }}>
+          <span className="file-icon" style={{ width: 44, height: 44 }}><Icon name={fileIconName(file.mime_type, file.original_name)} size={22} /></span>
+          <div className="col" style={{ gap: 2 }}>
+            <span style={{ fontWeight: 700 }}>{file.original_name}</span>
+            <span className="muted" style={{ fontSize: 13 }}>{(file.size_bytes / 1024 / 1024).toFixed(1)} MB · encrypted</span>
+          </div>
+        </div>
         {data.requires_password && (
-          <input type="password" placeholder="Share password" value={pass} onChange={(e) => setPass(e.target.value)} />
+          <>
+            <label>Share password</label>
+            <input type="password" placeholder="Password" value={pass} onChange={(e) => setPass(e.target.value)} />
+          </>
         )}
         <DownloadDecryptor token={token!} fileName={file.original_name} password={pass} iv={file.encryption_iv} />
       </div>
-      <p className="muted center" style={{ fontSize: 12, marginTop: 16 }}>
-        Recipients need the file's encryption key/passphrase to decrypt. This link delivers ciphertext only.
+      <p className="center muted" style={{ fontSize: 12, marginTop: 16 }}>
+        This link delivers ciphertext only — you'll need the file's passphrase to decrypt.
       </p>
     </div>
   )

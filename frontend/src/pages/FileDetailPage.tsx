@@ -5,6 +5,7 @@ import { api, http } from '../lib/api'
 import { useSession } from '../lib/store'
 import { decryptBlob } from '../lib/crypto'
 import { metaFromApi } from '../lib/uploader'
+import { Icon, fileIconName } from '../components/Icon'
 import { ShareModal } from '../components/ShareModal'
 
 function fmtBytes(n: number) {
@@ -50,25 +51,42 @@ export default function FileDetailPage() {
     if (!confirm('Delete this file and all its Telegram chunks?')) return
     await api.deleteFile(file.id)
     qc.invalidateQueries({ queryKey: ['files'] })
-    window.location.href = '/dashboard'
+    window.location.href = '/drive'
   }
 
   if (!file) return <div className="muted">Loading…</div>
 
   return (
     <div>
-      <h2>{file.original_name}</h2>
-      <div className="card">
-        <div className="muted" style={{ fontSize: 13 }}>
-          {fmtBytes(file.size_bytes)} · {file.status} · {file.total_chunks} chunks
-          {file.failure_reason && <div className="error">{file.failure_reason}</div>}
+      <div className="section-title">
+        <div className="row" style={{ margin: 0, gap: 14 }}>
+          <span className="file-icon" style={{ width: 44, height: 44 }}><Icon name={fileIconName(file.mime_type, file.original_name)} size={22} /></span>
+          <div className="col" style={{ gap: 2 }}>
+            <h2 style={{ margin: 0 }}>{file.original_name}</h2>
+            <span className="muted" style={{ fontSize: 13 }}>
+              {fmtBytes(file.size_bytes)} · {file.total_chunks} chunks · stored on Telegram
+            </span>
+          </div>
         </div>
-        <div className="row" style={{ marginTop: 16 }}>
-          <button disabled={file.status !== 'complete' || !!busy} onClick={download}>
-            {busy || 'Download & decrypt'}
-          </button>
-          <button className="ghost" disabled={file.status !== 'complete'} onClick={() => setShareOpen(true)}>Share</button>
-          <button className="danger" onClick={remove}>Delete</button>
+        <span className={`tag ${file.status === 'complete' ? 'active' : file.status === 'failed' ? 'failed' : 'pending'}`}>
+          <span className={`dot ${file.status === 'complete' ? 'active' : file.status === 'failed' ? 'failed' : 'pending'}`} />
+          {file.status}
+        </span>
+      </div>
+
+      <div className="card">
+        {file.failure_reason && <div className="error" style={{ marginBottom: 12 }}>{file.failure_reason}</div>}
+        <div className="spread">
+          <div className="muted" style={{ fontSize: 13, maxWidth: 480 }}>
+            Downloads stream the ciphertext from your Telegram channel and decrypt it locally in the browser.
+          </div>
+          <div className="row">
+            <button className="primary" disabled={file.status !== 'complete' || !!busy} onClick={download}>
+              {busy ? <>{busy}</> : <><Icon name="download" size={16} /> Download & decrypt</>}
+            </button>
+            <button className="ghost" disabled={file.status !== 'complete'} onClick={() => setShareOpen(true)}><Icon name="share" size={16} /> Share</button>
+            <button className="danger" onClick={remove}><Icon name="trash" size={16} /> Delete</button>
+          </div>
         </div>
         {error && <div className="error">{error}</div>}
       </div>

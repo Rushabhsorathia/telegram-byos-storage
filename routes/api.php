@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DriveController;
 use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\ShareController;
 use App\Http\Controllers\Api\StorageConnectionController;
@@ -8,9 +9,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/user', [AuthController::class, 'user']);
 
-Route::post('/register', [AuthController::class, 'register'])->middleware('guest');
-Route::post('/login', [AuthController::class, 'login'])->middleware('guest');
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth');
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/crypto/master-key', [AuthController::class, 'storeMasterKey']);
@@ -27,6 +28,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/files/{file}/download', [FileController::class, 'download']);
     Route::delete('/files/{file}', [FileController::class, 'destroy']);
     Route::post('/files/{file}/share', [FileController::class, 'share']);
+
+    // Google-Drive-style browse + folder/file metadata (move, star, trash, rename).
+    Route::get('/drive', [DriveController::class, 'index']);
+    Route::post('/folders', [DriveController::class, 'storeFolder']);
+    Route::patch('/folders/{folder}', [DriveController::class, 'updateFolder']);
+    Route::delete('/folders/{folder}', [DriveController::class, 'destroyFolder']);
+    Route::patch('/files/{file}/meta', [DriveController::class, 'updateFile']);
 });
 
 Route::get('/shares/{token}', [ShareController::class, 'show']);

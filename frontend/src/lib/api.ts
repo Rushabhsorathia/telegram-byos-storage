@@ -91,6 +91,25 @@ export const api = {
     const { data } = await http.post(`/api/files/${fileId}/share`, payload)
     return data.share
   },
+  async drive(view: string, folder: string) {
+    const { data } = await http.get('/api/drive', { params: { view, folder } })
+    return data
+  },
+  async createFolder(name: string, parentId: string, color?: string) {
+    const { data } = await http.post('/api/folders', { name, parent_id: parentId, color })
+    return data.folder
+  },
+  async updateFolder(id: number, payload: Record<string, unknown>) {
+    const { data } = await http.patch(`/api/folders/${id}`, payload)
+    return data.folder
+  },
+  async deleteFolder(id: number) {
+    await http.delete(`/api/folders/${id}`)
+  },
+  async updateFileMeta(id: number, payload: Record<string, unknown>) {
+    const { data } = await http.patch(`/api/files/${id}/meta`, payload)
+    return data.file
+  },
   downloadUrl(id: number) {
     return `${baseURL}/api/files/${id}/download`
   },

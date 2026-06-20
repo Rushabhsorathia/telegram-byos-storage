@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, http } from '../lib/api'
 import { decryptBlob } from '../lib/crypto'
+import { Icon } from './Icon'
 
 export function DownloadDecryptor({
   token,
@@ -47,7 +48,7 @@ export function DownloadDecryptor({
 
   return (
     <div>
-      <button onClick={run} disabled={!!busy}>{busy || 'Download & decrypt'}</button>
+      <button className="primary" onClick={run} disabled={!!busy}><Icon name="download" size={16} /> {busy || 'Download & decrypt'}</button>
       {error && <div className="error">{error}</div>}
     </div>
   )

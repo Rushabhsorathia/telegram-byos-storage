@@ -16,19 +16,46 @@ export interface StorageConnection {
   verified_at: string | null
 }
 
+export interface Folder {
+  id: number
+  parent_id: number | null
+  name: string
+  color: string
+  trashed_at: string | null
+  created_at: string
+}
+
 export interface FileRecord {
   id: number
   storage_connection_id: number
+  folder_id: number | null
   original_name: string
   size_bytes: number
   mime_type: string | null
   checksum_sha256: string | null
   status: 'uploading' | 'processing' | 'complete' | 'failed' | 'deleted'
+  starred: boolean
+  trashed_at: string | null
   total_chunks: number
   uploaded_chunks: number
   failure_reason: string | null
   created_at: string
   shares_count?: number
+}
+
+export interface Breadcrumb {
+  id: number
+  name: string
+}
+
+export type DriveView = 'my' | 'starred' | 'recent' | 'trash'
+
+export interface DriveContents {
+  view: DriveView
+  folder: Folder | null
+  breadcrumbs: Breadcrumb[]
+  folders: Folder[]
+  files: FileRecord[]
 }
 
 export interface Share {

@@ -1,41 +1,25 @@
-import { Navigate, Route, Routes, useLocation, Link } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './lib/api'
 import { useSession } from './lib/store'
 import { initEcho } from './lib/echo'
+import DriveLayout from './components/DriveLayout'
+import Drive from './pages/Drive'
 import AuthPage from './pages/AuthPage'
-import Dashboard from './pages/Dashboard'
 import UploadPage from './pages/UploadPage'
 import FileDetailPage from './pages/FileDetailPage'
 import StorageSettings from './pages/StorageSettings'
 import CryptoUnlockPage from './pages/CryptoUnlockPage'
 import SharePage from './pages/SharePage'
+import { Icon } from './components/Icon'
 
-function Topbar() {
-  const loc = useLocation()
-  const { user, clear } = useSession()
-  if (!user) return null
-  const link = (to: string, label: string) => (
-    <Link to={to} className={loc.pathname === to ? 'active' : ''}>{label}</Link>
-  )
-  return (
-    <div className="topbar">
-      <div className="brand">Telegram Storage</div>
-      <nav>
-        {link('/dashboard', 'Files')}
-        {link('/upload', 'Upload')}
-        {link('/settings/storage', 'Connections')}
-        <span className="muted" style={{ marginLeft: 8 }}>{user.email}</span>
-        <button className="ghost" style={{ marginLeft: 12 }} onClick={async () => { await api.logout(); clear(); window.location.href = '/auth' }}>Logout</button>
-      </nav>
-    </div>
-  )
-}
-
-function Protected({ children }: { children: React.ReactNode }) {
+function Protected({ authReady, children }: { authReady: boolean; children: React.ReactNode }) {
   const { user, crypto } = useSession()
   const loc = useLocation()
+  // While the session is still being verified on load, render nothing instead
+  // of prematurely redirecting to /auth (which would flash the login screen on refresh).
+  if (!authReady) return <Splash />
   if (!user) return <Navigate to="/auth" state={{ from: loc }} replace />
   if (!crypto.masterKey && user.crypto_enabled && loc.pathname !== '/unlock') {
     return <Navigate to="/unlock" replace />
@@ -43,34 +27,55 @@ function Protected({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function Splash() {
+  return (
+    <div className="center" style={{ marginTop: '18vh' }}>
+      <div className="brand-hero" style={{ marginBottom: 0 }}>
+        <div className="logo-lg" style={{ width: 48, height: 48 }}><Icon name="logo" size={22} /></div>
+      </div>
+      <p className="muted" style={{ marginTop: 14 }}>Loading your drive…</p>
+    </div>
+  )
+}
+
 export default function App() {
   const { setUser } = useSession()
 
-  const { data: me } = useQuery({
+  const { data: me, isLoading } = useQuery({
     queryKey: ['me'],
     queryFn: api.me,
     retry: false,
   })
 
   useEffect(() => {
-    if (me) setUser(me)
+    if (me) {
+      setUser(me)
+      ;(window as any).__uid = me.id
+    }
     initEcho()
   }, [me, setUser])
+
+  const authReady = !isLoading
+
   return (
-    <div className="app-shell">
-      <Topbar />
-      <Routes>
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/unlock" element={<CryptoUnlockPage />} />
-        <Route path="/s/:token" element={<SharePage />} />
+    <Routes>
+      <Route path="/auth" element={authReady && me ? <Navigate to="/drive" replace /> : <AuthPage />} />
+      <Route path="/unlock" element={<CryptoUnlockPage />} />
+      <Route path="/s/:token" element={<SharePage />} />
 
-        <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-        <Route path="/upload" element={<Protected><UploadPage /></Protected>} />
-        <Route path="/files/:id" element={<Protected><FileDetailPage /></Protected>} />
-        <Route path="/settings/storage" element={<Protected><StorageSettings /></Protected>} />
+      <Route element={<Protected authReady={authReady}><DriveLayout /></Protected>}>
+        <Route path="/drive" element={<Drive view="my" />} />
+        <Route path="/drive/f/:folderId" element={<Drive view="my" />} />
+        <Route path="/starred" element={<Drive view="starred" />} />
+        <Route path="/recent" element={<Drive view="recent" />} />
+        <Route path="/trash" element={<Drive view="trash" />} />
+        <Route path="/upload" element={<UploadPage />} />
+        <Route path="/files/:id" element={<FileDetailPage />} />
+        <Route path="/settings/storage" element={<StorageSettings />} />
+      </Route>
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </div>
+      <Route path="/dashboard" element={<Navigate to="/drive" replace />} />
+      <Route path="*" element={<Navigate to="/drive" replace />} />
+    </Routes>
   )
 }

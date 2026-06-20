@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
+    "agentation": "^3.0.2",
     "axios": "^1.7.7",
     "laravel-echo": "^1.16.5",
     "pusher-js": "^8.4.0",

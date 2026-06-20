@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { http } from '../lib/api'
 import { unlockMasterKey } from '../lib/crypto'
 import { useSession } from '../lib/store'
+import { Icon } from '../components/Icon'
 
 export default function CryptoUnlockPage() {
   const { user, setMasterKey } = useSession()
@@ -25,12 +26,12 @@ export default function CryptoUnlockPage() {
     try {
       if (!setup?.master_key_salt || !setup?.master_key_verifier) {
         setMasterKey(null)
-        nav('/dashboard')
+        nav('/drive')
         return
       }
       const key = await unlockMasterKey(pass, setup.master_key_salt, setup.master_key_verifier)
       setMasterKey(key)
-      nav('/dashboard')
+      nav('/drive')
     } catch (err: any) {
       setError(err.message || 'Could not unlock')
     } finally {
@@ -39,16 +40,19 @@ export default function CryptoUnlockPage() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: '60px auto' }}>
+    <div className="center-card">
+      <div className="brand-hero">
+        <div className="logo-lg"><Icon name="key" size={26} /></div>
+        <h1>Unlock your vault</h1>
+        <p>Enter your passphrase to decrypt file keys for this session.</p>
+      </div>
       <div className="card">
-        <h2>Unlock your vault</h2>
-        <p className="muted">Enter your encryption passphrase to decrypt file keys in this session.</p>
         <form onSubmit={unlock}>
           <input type="password" placeholder="Passphrase" value={pass} onChange={(e) => setPass(e.target.value)} autoFocus />
           {error && <div className="error">{error}</div>}
-          <div className="row">
+          <div className="row" style={{ marginTop: 4 }}>
             <button disabled={busy}>{busy ? 'Unlocking…' : 'Unlock'}</button>
-            <button type="button" className="ghost" onClick={() => { setMasterKey(null); nav('/dashboard') }}>Skip (view-only)</button>
+            <button type="button" className="ghost" onClick={() => { setMasterKey(null); nav('/drive') }}>Skip (view-only)</button>
           </div>
         </form>
       </div>

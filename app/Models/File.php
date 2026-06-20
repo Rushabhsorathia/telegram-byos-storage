@@ -17,6 +17,7 @@ class File extends Model
         'mime_type', 'checksum_sha256', 'encryption_iv', 'encryption_tag',
         'encrypted_key', 'key_metadata', 'total_chunks', 'uploaded_chunks',
         'upload_batch_id', 'temp_path', 'status', 'failure_reason',
+        'folder_id', 'starred', 'trashed_at',
     ];
 
     protected function casts(): array
@@ -25,6 +26,8 @@ class File extends Model
             'size_bytes' => 'integer',
             'total_chunks' => 'integer',
             'uploaded_chunks' => 'integer',
+            'starred' => 'boolean',
+            'trashed_at' => 'datetime',
         ];
     }
 
@@ -36,6 +39,11 @@ class File extends Model
     public function storageConnection(): BelongsTo
     {
         return $this->belongsTo(StorageConnection::class);
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(Folder::class);
     }
 
     public function chunks(): HasMany
@@ -51,6 +59,16 @@ class File extends Model
     public function scopeForUser(Builder $q, int $userId): Builder
     {
         return $q->where('user_id', $userId);
+    }
+
+    public function scopeNotTrashed(Builder $q): Builder
+    {
+        return $q->whereNull('trashed_at');
+    }
+
+    public function scopeOnlyTrashed(Builder $q): Builder
+    {
+        return $q->whereNotNull('trashed_at');
     }
 
     public function tempPath(): string
