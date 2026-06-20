@@ -84,6 +84,8 @@ return [
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 
+    'upload_temp_disk' => env('UPLOAD_TEMP_DISK', 'local'),
+
     /*
     |--------------------------------------------------------------------------
     | Encryption Key

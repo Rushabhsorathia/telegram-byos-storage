@@ -1,5 +1,10 @@
 *.log
 .DS_Store
+telegram_storage
+*.sqlite
+*.sqlite3
+database/*.sqlite
+database/*.sqlite3
 .env
 .env.backup
 .env.production
