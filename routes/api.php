@@ -16,6 +16,8 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanc
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/crypto/master-key', [AuthController::class, 'storeMasterKey']);
     Route::get('/crypto/setup', [AuthController::class, 'cryptoSetup']);
+    Route::patch('/user', [AuthController::class, 'updateProfile']);
+    Route::patch('/user/password', [AuthController::class, 'updatePassword']);
 
     Route::apiResource('storage-connections', StorageConnectionController::class)->except(['show', 'update']);
     Route::post('/storage-connections/{storage_connection}/verify', [StorageConnectionController::class, 'verify']);

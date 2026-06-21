@@ -30,7 +30,13 @@ return [
 
     'telegram_bot_api' => [
         'base_url' => env('TELEGRAM_BOT_API_BASE_URL', 'http://localhost:8081'),
-        'chunk_size_mb' => (int) env('TELEGRAM_CHUNK_SIZE_MB', 1),
+        // Maximum size of a single Telegram document (a "chunk"). Files at or below
+        // this size are uploaded as ONE document (no splitting). Larger files are split
+        // into equal parts, each <= this size. The Telegram local Bot API server allows
+        // up to 2000 MB per upload, so 1740 MB (~1.7 GB) leaves safe headroom.
+        // NOTE: the public api.telegram.org caps uploads at 50 MB — run a local Bot API
+        // server (see TELEGRAM_BOT_API_BASE_URL) to use large chunks.
+        'chunk_size_mb' => (int) env('TELEGRAM_CHUNK_SIZE_MB', 1740),
         'upload_concurrency' => (int) env('TELEGRAM_UPLOAD_CONCURRENCY', 3),
         'request_timeout' => (int) env('TELEGRAM_REQUEST_TIMEOUT', 600),
         'download_timeout' => (int) env('TELEGRAM_DOWNLOAD_TIMEOUT', 600),

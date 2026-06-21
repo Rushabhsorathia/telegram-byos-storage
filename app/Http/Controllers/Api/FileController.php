@@ -12,10 +12,9 @@ use App\Models\File;
 use App\Models\StorageConnection;
 use App\Services\Telegram\TelegramStorage;
 use Illuminate\Http\Request;
-use Illuminate\Http\StreamedResponse;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage as FilesystemFacade;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileController extends Controller
 {
@@ -33,7 +32,7 @@ class FileController extends Controller
 
     public function show(Request $request, File $file)
     {
-        abort_unless($file->user_id === $request->user()->id, 404);
+        abort_unless($file->user_id == $request->user()->id, 404);
 
         $file->load(['storageConnection:id,chat_title,bot_username', 'chunks:id,file_id,chunk_index,size_bytes,status', 'shares:id,file_id,token,expires_at,max_downloads,download_count']);
 
@@ -82,7 +81,7 @@ class FileController extends Controller
      */
     public function appendChunk(Request $request, File $file)
     {
-        abort_unless($file->user_id === $request->user()->id, 404);
+        abort_unless($file->user_id == $request->user()->id, 404);
         abort_if($file->status === 'complete', 422, 'Upload already complete.');
 
         $request->validate([
@@ -115,7 +114,7 @@ class FileController extends Controller
      */
     public function complete(Request $request, File $file)
     {
-        abort_unless($file->user_id === $request->user()->id, 404);
+        abort_unless($file->user_id == $request->user()->id, 404);
 
         $file->update(['status' => 'processing']);
         SplitAndUploadFileJob::dispatch($file->id);
@@ -125,7 +124,7 @@ class FileController extends Controller
 
     public function download(Request $request, File $file)
     {
-        abort_unless($file->user_id === $request->user()->id, 404);
+        abort_unless($file->user_id == $request->user()->id, 404);
         abort_if($file->status !== 'complete', 409, 'File is not fully uploaded yet.');
 
         return $this->streamedDownload($file, $file->storageConnection);
@@ -133,24 +132,32 @@ class FileController extends Controller
 
     public function destroy(Request $request, File $file)
     {
-        abort_unless($file->user_id === $request->user()->id, 404);
+        abort_unless($file->user_id == $request->user()->id, 404);
+
+        // purge_remote=true (default): also delete the encrypted chunks from Telegram.
+        // purge_remote=false: remove from Drive only, leaving the copy on Telegram.
+        $purgeRemote = $request->boolean('purge_remote', true);
 
         if ($file->temp_path) {
             FilesystemFacade::disk(config('app.upload_temp_disk', 'local'))->delete($file->temp_path);
         }
 
-        if (in_array($file->status, ['complete', 'failed', 'processing'])) {
+        if ($purgeRemote && in_array($file->status, ['complete', 'failed', 'processing'])) {
             DeleteRemoteChunksJob::dispatch($file->id);
         }
 
         $file->update(['status' => 'deleted']);
 
-        return response()->json(['message' => 'File scheduled for deletion']);
+        return response()->json([
+            'message' => $purgeRemote
+                ? 'File scheduled for deletion from Drive and Telegram'
+                : 'File removed from Drive (kept on Telegram)',
+        ]);
     }
 
     public function share(ShareFileRequest $request, File $file)
     {
-        abort_unless($file->user_id === $request->user()->id, 404);
+        abort_unless($file->user_id == $request->user()->id, 404);
 
         $data = $request->validated();
         if (! empty($data['password'])) {

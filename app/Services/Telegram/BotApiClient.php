@@ -39,11 +39,12 @@ class BotApiClient
     }
 
     /**
-     * Upload a document chunk to a chat. Returns the message id.
+     * Upload a document chunk to a chat.
      *
      * @param  resource|string  $body  Stream resource or file path.
+     * @return array{message_id: string, file_id: string}
      */
-    public function sendDocument(string|int $chatId, $body, ?string $filename = null): string
+    public function sendDocument(string|int $chatId, $body, ?string $filename = null): array
     {
         $isResource = is_resource($body);
         $filename ??= 'chunk.bin';
@@ -62,25 +63,32 @@ class BotApiClient
 
         $response = $this->call('sendDocument', multipart: $multipart);
 
-        return (string) $response['message_id'];
+        $fileId = $response['document']['file_id']
+            ?? throw new RuntimeException('sendDocument did not return a document.file_id.');
+
+        return [
+            'message_id' => (string) $response['message_id'],
+            'file_id' => (string) $fileId,
+        ];
     }
 
     /**
-     * Download a document referenced by message id into the given stream.
+     * Download a document by its file_id into the given stream.
+     * Works on both the public api.telegram.org and the local Bot API server.
+     *
+     * @param  resource  $targetStream  writable stream
      */
-    public function downloadDocument(string|int $chatId, string $messageId, $targetStream): void
+    public function downloadDocument(string $fileId, $targetStream): void
     {
-        $fileMeta = $this->call('getFile', ['chat_id' => $chatId, 'message_id' => (int) $messageId]);
-
-        $fileId = $fileMeta['document']['file_id']
-            ?? throw new RuntimeException('Message has no document attachment.');
+        // getFile accepts file_id on the public API; chat_id+message_id only on the local server.
+        $fileMeta = $this->call('getFile', ['file_id' => $fileId]);
 
         $path = $fileMeta['file_path']
             ?? throw new RuntimeException('Bot API did not return a file_path.');
 
         $downloadUrl = $this->baseUrl.'/file/bot'.$this->botToken.'/'.$path;
 
-        $response = Http::withOptions(['sink' => $targetStream, 'stream' => true])
+        $response = Http::withOptions(['sink' => $targetStream])
             ->timeout($this->timeout)
             ->get($downloadUrl);
 
@@ -89,7 +97,7 @@ class BotApiClient
         }
     }
 
-    public function deleteMessage(string|int $chatId, string $messageId): array
+    public function deleteMessage(string|int $chatId, string $messageId): mixed
     {
         return $this->call('deleteMessage', [
             'chat_id' => $chatId,
@@ -97,7 +105,7 @@ class BotApiClient
         ]);
     }
 
-    public function call(string $method, array $query = [], ?array $multipart = null, int $maxAttempts = 4): array
+    public function call(string $method, array $query = [], ?array $multipart = null, int $maxAttempts = 4): mixed
     {
         $url = $this->baseUrl.'/bot'.$this->botToken.'/'.$method;
         $attempt = 0;

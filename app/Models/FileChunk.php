@@ -12,7 +12,7 @@ class FileChunk extends Model
 
     protected $fillable = [
         'file_id', 'chunk_index', 'size_bytes', 'checksum_sha256',
-        'telegram_message_id', 'status', 'attempts', 'last_error',
+        'telegram_message_id', 'telegram_file_id', 'status', 'attempts', 'last_error',
     ];
 
     protected function casts(): array

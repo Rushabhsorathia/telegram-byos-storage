@@ -35,11 +35,13 @@ class TelegramStorage
         $client = $this->client($connection);
 
         foreach ($file->chunks()->orderBy('chunk_index')->get() as $chunk) {
-            if (! $chunk->telegram_message_id) {
-                throw new RuntimeException("Chunk {$chunk->chunk_index} has no telegram message id.");
+            // Prefer the stored file_id (public API). Fall back to message_id (local server).
+            $ref = $chunk->telegram_file_id ?: $chunk->telegram_message_id;
+            if (! $ref) {
+                throw new RuntimeException("Chunk {$chunk->chunk_index} has no telegram reference.");
             }
 
-            $client->downloadDocument($connection->chat_id, $chunk->telegram_message_id, $target);
+            $client->downloadDocument($ref, $target);
         }
     }
 
@@ -66,6 +68,27 @@ class TelegramStorage
     }
 
     /**
+     * Number of chunks a file of the given size is split into.
+     *
+     * Files <= the max chunk size stay as a single document (no splitting).
+     * Larger files are divided into the fewest equal parts that each fit under
+     * the limit, e.g. a 3 GB file with a 1.7 GB limit becomes 2 x 1.5 GB.
+     */
+    public function chunkCountFor(int $size): int
+    {
+        return max(1, (int) ceil($size / $this->chunkSize));
+    }
+
+    /**
+     * Byte length of each (equal) chunk for a file, derived from its size and
+     * planned chunk count. Shared by planning and upload so they never drift.
+     */
+    public function chunkLengthFor(int $size, int $chunkCount): int
+    {
+        return (int) ceil($size / max(1, $chunkCount));
+    }
+
+    /**
      * Create/refresh chunk plan rows based on file size.
      */
     public function ensureChunksPlanned(File $file, string $absolutePath): void
@@ -77,14 +100,16 @@ class TelegramStorage
         $size = filesize($absolutePath) ?: $file->size_bytes;
         $file->size_bytes = $size;
 
-        $chunkCount = max(1, (int) ceil($size / $this->chunkSize));
+        $chunkCount = $this->chunkCountFor($size);
+        $perChunk = $this->chunkLengthFor($size, $chunkCount);
 
         $rows = [];
         for ($i = 0; $i < $chunkCount; $i++) {
+            $offset = $i * $perChunk;
             $rows[] = [
                 'file_id' => $file->id,
                 'chunk_index' => $i,
-                'size_bytes' => (int) min($this->chunkSize, $size - $i * $this->chunkSize),
+                'size_bytes' => (int) min($perChunk, $size - $offset),
                 'status' => 'pending',
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -93,7 +118,7 @@ class TelegramStorage
 
         FileChunk::insert($rows);
 
-        $file->update(['total_chunks' => $chunkCount]);
+        $file->update(['total_chunks' => $chunkCount, 'size_bytes' => $size]);
     }
 
     public function resolvePath(string $relativePath): string

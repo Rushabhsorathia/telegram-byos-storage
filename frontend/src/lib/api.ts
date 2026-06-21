@@ -43,6 +43,17 @@ export const api = {
     const { data } = await http.get('/api/user')
     return data.user
   },
+  async updateProfile(name: string, email: string) {
+    const { data } = await http.patch('/api/user', { name, email })
+    return data.user
+  },
+  async updatePassword(currentPassword: string, password: string, passwordConfirmation: string) {
+    await http.patch('/api/user/password', {
+      current_password: currentPassword,
+      password,
+      password_confirmation: passwordConfirmation,
+    })
+  },
   async saveMasterKey(salt: string, verifier: string) {
     await http.post('/api/crypto/master-key', { master_key_salt: salt, master_key_verifier: verifier })
   },
@@ -84,8 +95,8 @@ export const api = {
     const { data } = await http.post(`/api/files/${fileId}/complete`)
     return data.file
   },
-  async deleteFile(id: number) {
-    await http.delete(`/api/files/${id}`)
+  async deleteFile(id: number, purgeRemote = true) {
+    await http.delete(`/api/files/${id}`, { data: { purge_remote: purgeRemote } })
   },
   async createShare(fileId: number, payload: { password?: string; expires_at?: string; max_downloads?: number }) {
     const { data } = await http.post(`/api/files/${fileId}/share`, payload)

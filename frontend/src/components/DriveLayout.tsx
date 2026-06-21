@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { useSession } from '../lib/store'
 import { useEffect, useRef, useState } from 'react'
 import { Icon, type IconName } from './Icon'
+import { AccountModal } from './AccountModal'
 
 function fmtBytes(n: number) {
   if (!n) return '0 B'
@@ -12,15 +13,27 @@ function fmtBytes(n: number) {
   return `${(n / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${u[i]}`
 }
 
+/** Current folder id parsed from the URL (/drive/f/:id), or 'root'. */
+function currentFolderId(pathname: string) {
+  const m = pathname.match(/^\/drive\/f\/(\d+)/)
+  return m ? m[1] : 'root'
+}
+
 export default function DriveLayout() {
   const loc = useLocation()
   const nav = useNavigate()
-  const { user, clear } = useSession()
+  const { user, clear, query, setQuery } = useSession()
   const qc = useQueryClient()
   const [usage, setUsage] = useState<number>(0)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const [folderModal, setFolderModal] = useState(false)
+  const [folderName, setFolderName] = useState('')
+  const [creating, setCreating] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const newMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     api.connections().then((d) => setUsage(d.usage_bytes ?? 0)).catch(() => {})
@@ -30,29 +43,23 @@ export default function DriveLayout() {
   useEffect(() => {
     setUserMenuOpen(false)
     setMobileNavOpen(false)
+    setNewMenuOpen(false)
   }, [loc.pathname])
 
-  // Click-outside to close the avatar dropdown
+  // Click-outside to close the open dropdowns
   useEffect(() => {
-    if (!userMenuOpen) return
     const handler = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false)
-      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false)
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) setNewMenuOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [userMenuOpen])
+  }, [])
 
   // /drive should only be "active" exactly on root, not inside a folder breadcrumb
   const isActive = (to: string) => {
-    if (to === '/drive') return loc.pathname === '/drive'
+    if (to === '/drive') return loc.pathname === '/drive' || loc.pathname.startsWith('/drive/f/')
     return loc.pathname === to || loc.pathname.startsWith(to + '/')
-  }
-
-  const go = (to: string) => {
-    qc.invalidateQueries({ queryKey: ['drive'] })
-    nav(to)
   }
 
   const navItem = (to: string, ico: IconName, label: string) => (
@@ -61,9 +68,23 @@ export default function DriveLayout() {
       className={`nav-item ${isActive(to) ? 'active' : ''}`}
       onClick={() => qc.invalidateQueries({ queryKey: ['drive'] })}
     >
-      <span className="ico"><Icon name={ico} size={18} /></span> {label}
+      <span className="ico"><Icon name={ico} size={20} /></span> {label}
     </Link>
   )
+
+  const createFolder = async () => {
+    if (!folderName.trim()) return
+    setCreating(true)
+    try {
+      await api.createFolder(folderName.trim(), currentFolderId(loc.pathname))
+      setFolderName('')
+      setFolderModal(false)
+      qc.invalidateQueries({ queryKey: ['drive'] })
+      if (!loc.pathname.startsWith('/drive')) nav('/drive')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const quota = Math.min(100, (usage / (15 * 1024 ** 3)) * 100)
   const sidebar = (
@@ -73,14 +94,30 @@ export default function DriveLayout() {
         <span className="name">Telegram<span>Storage</span></span>
       </div>
 
-      <button className="new-btn" onClick={() => go('/upload')}>
-        <span className="plus"><Icon name="plus" size={16} /></span> New
-      </button>
+      <div className="new-wrap" ref={newMenuRef}>
+        <button className="new-btn" onClick={() => setNewMenuOpen((v) => !v)}>
+          <span className="plus"><Icon name="plus" size={16} /></span> New
+        </button>
+        {newMenuOpen && (
+          <div className="menu new-menu">
+            <button onClick={() => { setNewMenuOpen(false); setFolderModal(true) }}>
+              <span className="mi"><Icon name="folder" size={18} /></span> New folder
+            </button>
+            <div className="menu-sep" />
+            <button onClick={() => { setNewMenuOpen(false); nav('/upload') }}>
+              <span className="mi"><Icon name="upload" size={18} /></span> File upload
+            </button>
+            <button onClick={() => { setNewMenuOpen(false); nav('/upload') }}>
+              <span className="mi"><Icon name="folder-open" size={18} /></span> Folder upload
+            </button>
+          </div>
+        )}
+      </div>
 
       <nav className="nav-section">
-        {navItem('/drive', 'drive', 'My Drive')}
-        {navItem('/starred', 'star', 'Starred')}
+        {navItem('/drive', 'folder', 'My Drive')}
         {navItem('/recent', 'clock', 'Recent')}
+        {navItem('/starred', 'star', 'Starred')}
         {navItem('/trash', 'trash', 'Trash')}
       </nav>
 
@@ -89,9 +126,10 @@ export default function DriveLayout() {
       </nav>
 
       <div className="sidebar-storage">
-        <div className="hint"><strong>Storage</strong></div>
+        <div className="hint"><Icon name="cloud" size={16} /> <strong>Storage</strong></div>
         <div className="storage-bar"><div style={{ width: `${quota}%` }} /></div>
-        <div className="hint">{fmtBytes(usage)} used on your Telegram</div>
+        <div className="hint">{fmtBytes(usage)} of 15 GB used</div>
+        <Link to="/settings/storage" className="storage-link">Manage storage</Link>
       </div>
     </>
   )
@@ -115,13 +153,23 @@ export default function DriveLayout() {
           <Icon name="menu" size={20} />
         </button>
         <div className="search">
-          <Icon name="search" size={18} />
-          <input placeholder="Search in Drive (visual only)" />
+          <Icon name="search" size={20} />
+          <input
+            placeholder="Search in Drive"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query && (
+            <button className="search-clear" title="Clear" onClick={() => setQuery('')}>
+              <Icon name="x" size={16} />
+            </button>
+          )}
         </div>
         <div className="topbar-actions">
-          <button className="icon-btn" title="Settings" onClick={() => go('/settings/storage')}>
-            <Icon name="settings" size={19} />
+          <button className="icon-btn" title="Connections" onClick={() => nav('/settings/storage')}>
+            <Icon name="settings" size={20} />
           </button>
+          <span className="topbar-divider" />
           <div style={{ position: 'relative' }} ref={userMenuRef}>
             <button
               className={`avatar ${userMenuOpen ? 'open' : ''}`}
@@ -133,11 +181,19 @@ export default function DriveLayout() {
             {userMenuOpen && (
               <div className="menu user-menu">
                 <div className="user-head">
-                  <div style={{ fontWeight: 600 }}>{user?.name}</div>
-                  <div className="hint">{user?.email}</div>
+                  <span className="avatar" style={{ width: 44, height: 44, fontSize: 17 }}>
+                    {(user?.name || user?.email || '?')[0].toUpperCase()}
+                  </span>
+                  <div className="col" style={{ gap: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{user?.name}</div>
+                    <div className="hint" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
+                  </div>
                 </div>
+                <button onClick={() => { setUserMenuOpen(false); setAccountOpen(true) }}>
+                  <Icon name="edit" size={18} /> Account settings
+                </button>
                 <button onClick={async () => { await api.logout(); clear(); nav('/auth') }}>
-                  <Icon name="logout" size={17} /> Sign out
+                  <Icon name="logout" size={18} /> Sign out
                 </button>
               </div>
             )}
@@ -149,6 +205,30 @@ export default function DriveLayout() {
       <main className="drive-main">
         <Outlet />
       </main>
+
+      {accountOpen && <AccountModal onClose={() => setAccountOpen(false)} />}
+
+      {/* New folder modal */}
+      {folderModal && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setFolderModal(false)}>
+          <div className="modal" style={{ width: 420 }}>
+            <h2 style={{ marginBottom: 18 }}>New folder</h2>
+            <input
+              autoFocus
+              placeholder="Untitled folder"
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') createFolder(); if (e.key === 'Escape') setFolderModal(false) }}
+            />
+            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="ghost" onClick={() => setFolderModal(false)}>Cancel</button>
+              <button className="primary" disabled={creating || !folderName.trim()} onClick={createFolder}>
+                {creating ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -45,27 +45,42 @@ class SplitAndUploadFileJob implements ShouldQueue
 
         $chunks = $file->chunks()->orderBy('chunk_index')->get()->values();
 
+        $fileId = $file->id;
+
         $batch = Bus::batch(
             $chunks->map(fn ($chunk) => new UploadChunkJob($file->id, $chunk->id))
         )
-            ->then(function (Batch $batch) use ($file) {
-                $file->refresh();
+            ->then(function (Batch $batch) use ($fileId) {
+                $file = File::find($fileId);
+                if (! $file) {
+                    return;
+                }
                 $file->update([
                     'status' => 'complete',
                     'uploaded_chunks' => $file->total_chunks,
                 ]);
                 FileProgressUpdated::dispatch($file->fresh(), 'Upload complete');
 
-                $this->cleanupTemp($file);
+                // NOTE: must be a static call — referencing $this inside a batch
+                // callback serializes the whole job graph and exhausts memory.
+                self::cleanupTemp($file);
             })
-            ->catch(function (Batch $batch, Throwable $e) use ($file) {
+            ->catch(function (Batch $batch, Throwable $e) use ($fileId) {
+                $file = File::find($fileId);
+                if (! $file) {
+                    return;
+                }
                 $file->update([
                     'status' => 'failed',
                     'failure_reason' => mb_substr($e->getMessage(), 0, 1000),
                 ]);
                 FileProgressUpdated::dispatch($file->fresh(), 'Upload failed');
             })
-            ->progress(function (Batch $batch) use ($file) {
+            ->progress(function (Batch $batch) use ($fileId) {
+                $file = File::find($fileId);
+                if (! $file) {
+                    return;
+                }
                 $file->update(['uploaded_chunks' => $batch->processedJobs()]);
                 FileProgressUpdated::dispatch($file->fresh(), 'Uploading chunks');
             })
@@ -77,7 +92,7 @@ class SplitAndUploadFileJob implements ShouldQueue
         FileProgressUpdated::dispatch($file->fresh(), 'Dispatched chunk batch');
     }
 
-    private function cleanupTemp(File $file): void
+    private static function cleanupTemp(File $file): void
     {
         if (! $file->temp_path) {
             return;

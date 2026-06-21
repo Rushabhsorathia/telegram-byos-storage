@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\StoreMasterKeyRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -87,5 +88,43 @@ class AuthController extends Controller
             'master_key_salt' => $user->master_key_salt,
             'master_key_verifier' => $user->master_key_verifier,
         ]);
+    }
+
+    /**
+     * Update profile (name + email).
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
+        ]);
+
+        $user->update($data);
+
+        return response()->json(['user' => $user->fresh()]);
+    }
+
+    /**
+     * Change the account password (requires the current password).
+     */
+    public function updatePassword(Request $request)
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => __('The current password is incorrect.'),
+            ]);
+        }
+
+        $user->update(['password' => $data['password']]);
+
+        return response()->json(['message' => 'Password updated']);
     }
 }

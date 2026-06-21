@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './lib/api'
 import { useSession } from './lib/store'
 import { initEcho } from './lib/echo'
@@ -40,6 +40,7 @@ function Splash() {
 
 export default function App() {
   const { setUser } = useSession()
+  const qc = useQueryClient()
 
   const { data: me, isLoading } = useQuery({
     queryKey: ['me'],
@@ -49,11 +50,17 @@ export default function App() {
 
   useEffect(() => {
     if (me) {
+      // If the authenticated user changed (new login / different session),
+      // wipe cached server data so no other user's files/connections leak.
+      const prev = (window as any).__uid
+      if (prev && prev !== me.id) {
+        qc.clear()
+      }
       setUser(me)
       ;(window as any).__uid = me.id
     }
     initEcho()
-  }, [me, setUser])
+  }, [me, setUser, qc])
 
   const authReady = !isLoading
 

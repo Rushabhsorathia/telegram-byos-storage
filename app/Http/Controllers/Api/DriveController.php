@@ -78,7 +78,7 @@ class DriveController extends Controller
 
     public function updateFolder(UpdateFolderRequest $request, Folder $folder)
     {
-        abort_unless($folder->user_id === $request->user()->id, 403);
+        abort_unless($folder->user_id == $request->user()->id, 403);
 
         $data = $request->validated();
         if (array_key_exists('parent_id', $data)) {
@@ -96,7 +96,7 @@ class DriveController extends Controller
 
     public function destroyFolder(Request $request, Folder $folder)
     {
-        abort_unless($folder->user_id === $request->user()->id, 403);
+        abort_unless($folder->user_id == $request->user()->id, 403);
 
         // Permanent delete — also wipes files inside (cascade) and remote chunks.
         foreach ($folder->files()->get() as $file) {
@@ -109,7 +109,7 @@ class DriveController extends Controller
 
     public function updateFile(UpdateFileMetaRequest $request, File $file)
     {
-        abort_unless($file->user_id === $request->user()->id, 403);
+        abort_unless($file->user_id == $request->user()->id, 403);
 
         $data = $request->validated();
         if (array_key_exists('folder_id', $data)) {

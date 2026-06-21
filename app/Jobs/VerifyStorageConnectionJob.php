@@ -44,14 +44,15 @@ class VerifyStorageConnectionJob implements ShouldQueue
             $me = $client->getMe();
             $connection->bot_username = $me['username'] ?? $connection->bot_username;
 
-            $messageId = $client->sendDocument(
+            $sent = $client->sendDocument(
                 chatId: $connection->chat_id,
                 body: $absolute,
                 filename: 'verify.bin',
             );
 
             $tmpOut = tmpfile();
-            $client->downloadDocument($connection->chat_id, $messageId, $tmpOut);
+            $client->downloadDocument($sent['file_id'], $tmpOut);
+            rewind($tmpOut);
             $downloaded = stream_get_contents($tmpOut);
             fclose($tmpOut);
 
@@ -59,7 +60,7 @@ class VerifyStorageConnectionJob implements ShouldQueue
                 throw new TelegramApiException('Round-trip integrity check failed.');
             }
 
-            $client->deleteMessage($connection->chat_id, $messageId);
+            $client->deleteMessage($connection->chat_id, $sent['message_id']);
 
             $connection->update([
                 'status' => 'active',

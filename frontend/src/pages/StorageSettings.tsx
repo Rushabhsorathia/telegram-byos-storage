@@ -10,6 +10,8 @@ export default function StorageSettings() {
   const [form, setForm] = useState({ bot_token: '', chat_id: '', chat_title: '', label: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [verifying, setVerifying] = useState<number | null>(null)
+  const [err, setErr] = useState<string | null>(null)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,7 +54,11 @@ export default function StorageSettings() {
             <div key={c.id}>
               <StorageConnectionCard connection={c} />
               <div className="row" style={{ marginTop: -6, marginBottom: 4, paddingLeft: 2 }}>
-                <button className="ghost" onClick={async () => { await api.verifyConnection(c.id); refetch() }}>Verify now</button>
+                <button className="ghost" disabled={verifying === c.id} onClick={async () => {
+                  setVerifying(c.id); setErr(null)
+                  try { await api.verifyConnection(c.id) } catch (e: any) { setErr(e.response?.data?.message || 'Verification failed') }
+                  finally { setVerifying(null); refetch() }
+                }}>{verifying === c.id ? 'Verifying…' : 'Verify now'}</button>
                 <button className="danger" onClick={async () => { await api.deleteConnection(c.id); refetch() }}>Remove</button>
                 {c.last_error && <span className="error">{c.last_error}</span>}
               </div>
@@ -63,6 +69,7 @@ export default function StorageSettings() {
 
       <div className="card">
         <h2>Add a connection</h2>
+        {err && <div className="error" style={{ marginBottom: 12 }}>{err}</div>}
         <form onSubmit={submit}>
           <label>Bot token</label>
           <input placeholder="123456:ABC-DEF… (from BotFather)" value={form.bot_token} onChange={(e) => setForm({ ...form, bot_token: e.target.value })} required />
